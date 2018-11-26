@@ -10,6 +10,20 @@ chn_filename="channels_csv"
 pd_filename="products.csv"
 all_files=[]
 file_handles=[]
+all_prod=[]
+
+#Policy class
+class Policy:
+    def __init__(self, id):
+        #create policy with id, start date, end date, status
+        self.id=id #unique id of policy sold. Eg PL001
+        self.policy_start="20101010"
+        self.policy_end="20151009"
+        self.status="Lapse"
+        self.product="PD001" #product ID
+
+    def print_header(file_handle):
+        file_handle.write("ID, Policy_Start, Policy_End, Product_ID,Status\n")
 
 
 #Product class
@@ -20,7 +34,7 @@ class Product:
         self.name=name #name of product. Eg. Term Life
 
     def print_header(file_handle):
-        file_handle.write("ID, Name\n")
+        file_handle.write("Product_ID, Name\n")
 
 #Policyholder class
 class Policyholder:
@@ -33,9 +47,10 @@ class Policyholder:
         self.smoker="Y" #Y, N
         self.uw_status="standard" # standard, substandard
         self.fab="Y" #Y, N - Fab is a healthy lifestyle programme
+        self.first_policy_date="" #start date of first policy purchased
 
     def print_header(file_handle):
-        file_handle.write(",".join(["ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"]))
+        file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"]))
         file_handle.write("\n")
     
     def output_details(self):
@@ -45,9 +60,19 @@ class Policyholder:
         file_handles[0].writelines(ph_line)
         file_handles[0].write("\n")
 
+    def transact_sim(self):
+        #purchase k number of policies. Currently only have 4 products.
+        num_policies = 3 
+        #for policy created, identify channel, product, then claims
+        for x in range(3):
+            print("create policy with product, agent, policy start date, term")
+            print("determine if claimed")
+    
     def run_transactions(self):
         print("Create policy and claim transactions")
+        self.transact_sim()
 
+    
 
 #portfolio creation
 def run_sim(n):
@@ -59,8 +84,6 @@ def run_sim(n):
         ph=Policyholder()
         ph.output_details()
         ph.run_transactions()
-
-
 
 
 #init files
@@ -75,6 +98,7 @@ def init():
 
     #print headers
     Policyholder.print_header(file_handles[0])
+    Policy.print_header(file_handles[2])
     Product.print_header(file_handles[4])
     #setup agents, products etc.
     setup_products()
