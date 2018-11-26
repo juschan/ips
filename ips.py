@@ -7,29 +7,43 @@ ph_filename = "policyholders.csv"
 clm_filename="claims.csv"
 pol_filename="policies.csv"
 chn_filename="channels_csv"
+pd_filename="products.csv"
 all_files=[]
 file_handles=[]
 
-#Policyholder classf
+
+#Product class
+class Product:
+
+    def __init__(self, id, name):
+        self.id=id #id of product. Eg. PD001
+        self.name=name #name of product. Eg. Term Life
+
+    def print_header(file_handle):
+        file_handle.write("ID, Name\n")
+
+#Policyholder class
 class Policyholder:
     
     def __init__(self):
         #create policyholder data
-        self.id="P0001" #Pxxxx
+        self.id="PH0001" #Pxxxx
         self.gender="M" #M, F
         self.dob="19990101" #YYYYMMDD
         self.smoker="Y" #Y, N
         self.uw_status="standard" # standard, substandard
         self.fab="Y" #Y, N - Fab is a healthy lifestyle programme
 
-    def print_header():
-        print(",".join("ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"))
+    def print_header(file_handle):
+        file_handle.write(",".join(["ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"]))
+        file_handle.write("\n")
     
     def output_details(self):
         details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab)
         ph_line=(", ").join(details)
         print(ph_line)
         file_handles[0].writelines(ph_line)
+        file_handles[0].write("\n")
 
     def run_transactions(self):
         print("Create policy and claim transactions")
@@ -46,17 +60,38 @@ def run_sim(n):
         ph.output_details()
         ph.run_transactions()
 
-#init and setup files
+
+
+
+#init files
 def init():
     print("Run init")
     #configure and create files
-    all_files=[ph_filename, clm_filename, pol_filename, chn_filename]
+    all_files=[ph_filename, clm_filename, pol_filename, chn_filename, pd_filename]
     for f in all_files:
         output=open(f, 'w')
         file_handles.append(output)
     print("init files: " + str(file_handles))
-    #setup agents, products etc.
 
+    #print headers
+    Policyholder.print_header(file_handles[0])
+    Product.print_header(file_handles[4])
+    #setup agents, products etc.
+    setup_products()
+
+
+#setup products:
+def setup_products():
+    #create multiple products default templates
+    p1=Product("PD001", "Term Life")
+    p2=Product("PD002", "Whole of Life")
+    p3=Product("PD003", "Standalone Critical Illness")
+    p4=Product("PD004", "Hospitalization")
+    all_prod=[p1, p2, p3, p4]
+       
+    for p in all_prod:
+        file_handles[4].write(",".join([str(p.id), str(p.name)]))
+        file_handles[4].write("\n")
 
 #housekeeping stuff
 def housekeep():
