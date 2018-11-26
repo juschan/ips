@@ -10,7 +10,7 @@ chn_filename="channels_csv"
 all_files=[]
 file_handles=[]
 
-#Policyholder class
+#Policyholder classf
 class Policyholder:
     
     def __init__(self):
@@ -25,9 +25,11 @@ class Policyholder:
     def print_header():
         print(",".join("ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"))
     
-    def print_details(self):
+    def output_details(self):
         details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab)
-        print((", ").join(details))
+        ph_line=(", ").join(details)
+        print(ph_line)
+        file_handles[0].writelines(ph_line)
 
     def run_transactions(self):
         print("Create policy and claim transactions")
@@ -41,10 +43,8 @@ def run_sim(n):
         print("Running Policyholder: " + str(x))
         #Create policyholder and transaction
         ph=Policyholder()
-        ph.print_details()
+        ph.output_details()
         ph.run_transactions()
-        output()
-
 
 #init and setup files
 def init():
@@ -58,11 +58,6 @@ def init():
     #setup agents, products etc.
 
 
-#output stuff
-def output():
-    print("Output policyholder info.")
-
-
 #housekeeping stuff
 def housekeep():
     print("Run housekeeping")
@@ -71,13 +66,6 @@ def housekeep():
         f.close()
     print("Completed housekeeping - closed all opened files")
 
-
-#declare variables
-num_ph = 10
-ph_filename = "policyholders.csv"
-clm_filename="claims.csv"
-pol_filename="policies.csv"
-chn_filename="channels_csv"
 
 #run simulator
 init()
