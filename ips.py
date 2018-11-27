@@ -1,5 +1,6 @@
 #import libraries - csv
-
+import random
+import numpy as np
 
 #declare variables
 num_ph = 10
