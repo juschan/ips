@@ -18,6 +18,9 @@ ph_id_count=0
 pol_id_count=0
 clm_id_count=0
 
+# Have 10 years of simulated time - simulate for the period 2007/1/1 till 2017/12/31
+total_days = 366*3 + 365*7 # 3 leap years (2008, 2012, 2016) and 7 non-leap
+
 #utility functions
 def get_uw_status():
     result=np.random.binomial(size=1, n=1, p=0.7)
@@ -108,11 +111,18 @@ class Product:
         p2=Product("PD002", "Whole of Life")
         p3=Product("PD003", "Standalone Critical Illness")
         p4=Product("PD004", "Hospitalization")
+        
+        global all_prod
         all_prod=[p1, p2, p3, p4]
         
         for p in all_prod:
             file_handle.write(",".join([str(p.id), str(p.name)]))
             file_handle.write("\n")
+
+    def gen_pd_id():
+        global all_prod
+        prod=random.choice(all_prod)
+        return prod.id
 
 #Channel class
 class Channel:
@@ -140,6 +150,7 @@ class Channel:
         c10=Channel("CH0010", "IFA", "IFA 4")
 
         #Add Bank and IFA
+        global all_ch
         all_ch=[c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
 
         #create agency channel
@@ -147,10 +158,15 @@ class Channel:
         for i in range(11,1111):
             i_length = len(str(i))
             all_ch.append(Channel( "CH" + "0"*(4-i_length) + str(i) , "Agency" , "Agent " + str(i)))
-        
+
         for c in all_ch:
             file_handle.write(", ".join([str(c.id), c.type, c.name]))
             file_handle.write("\n")
+        
+    def gen_ch_id():
+        global all_ch
+        ch=random.choice(all_ch)
+        return ch.id
 
 #Policyholder class
 class Policyholder:
@@ -191,7 +207,7 @@ class Policyholder:
         ph_pols=[]
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
-            pol = Policy("2010/10/10", "2015/10/09", "PD001", "CH0011", gen_sa, [], "")
+            pol = Policy("2010/10/10", "2015/10/09", Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
             ph_pols.append(pol)
 
 
@@ -224,6 +240,7 @@ def run_sim(n):
 #init files
 def init():
     #configure and create files
+    global all_files
     all_files=[ph_filename, clm_filename, pol_filename, chn_filename, pd_filename]
     for f in all_files:
         output=open(f, 'w')
