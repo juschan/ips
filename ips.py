@@ -15,19 +15,20 @@ all_ch=[]
  
 #Policy class
 class Policy:
-    def __init__(self, id, policy_start, policy_end, product_id, status):
+    def __init__(self, id, policy_start, policy_end, product_id, channel_id, status):
         #create policy with id, start date, end date, status
         self.id=id #unique id of policy sold. Eg PL001
-        self.policy_start="20101010"
-        self.policy_end="20151009"
-        self.product_id="PD001" #product ID
-        self.status="Lapse"
+        self.policy_start=policy_start
+        self.policy_end=policy_end
+        self.product_id=product_id #product ID
+        self.channel_id=channel_id #channel ID
+        self.status=status
         
     def print_header(file_handle):
-        file_handle.write("Policy_ID, Policy_Start, Policy_End, Product_ID,Status\n")
+        file_handle.write("Policy_ID, Policy_Start, Policy_End, Product_ID, Channel_ID, Status\n")
 
     def output_details(self, file_handle):
-        details = (self.id, self.policy_start, self.policy_end, self.product_id, self.status,)
+        details = (self.id, self.policy_start, self.policy_end, self.product_id, self.channel_id, self.status,)
         pol_line=(", ").join(details)
         print(pol_line)
         file_handle.writelines(pol_line)
@@ -125,7 +126,7 @@ class Policyholder:
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
             print("create policy with product, agent, policy start date, term")
-            pol = Policy("PL001", "20101010", "20151009", "PD001", "Lapse")
+            pol = Policy("PL001", "20101010", "20151009", "PD001", "CH0011", "Lapse")
             print("Housekeep - add to list of policies")
             ph_pols.append(pol)
 
