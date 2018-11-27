@@ -4,7 +4,8 @@ import numpy as np
 
 #declare variables
 num_ph = 10
-ph_filename = "policyholders.csv"
+avg_pol = 3 #average number of policies per policyholder
+ph_filename="policyholders.csv"
 clm_filename="claims.csv"
 pol_filename="policies.csv"
 chn_filename="channels.csv"
@@ -13,12 +14,40 @@ all_files=[]
 file_handles=[]
 all_prod=[]
 all_ch=[]
- 
+ph_id_count=0
+pol_id_count=0
+clm_id_count=0
+
+#utility functions
+def get_uw_status():
+    result=np.random.binomial(size=1, n=1, p=0.7)
+    if result==1:
+        return "standard"
+    return "substandard"
+
+def gen_ph_id():
+    max_len=len(str(num_ph))
+    global ph_id_count
+    ph_id_count= ph_id_count+1
+    return "PH" + "0"*(max_len-len(str(ph_id_count))) + str(ph_id_count) 
+
+def gen_policy_id():
+    max_len=len(str(num_ph * avg_pol))
+    global pol_id_count
+    pol_id_count=pol_id_count+1
+    return "PL" + "0"*(max_len-len(str(pol_id_count))) + str(pol_id_count)   
+
+def gen_claim_id():
+    max_len=len(str(num_ph * avg_pol))
+    global clm_id_count
+    clm_id_count=clm_id_count+1
+    return "CL" + "0"*(max_len-len(str(clm_id_count))) + str(clm_id_count)
+
 #Policy class
 class Policy:
-    def __init__(self, id, policy_start, policy_end, product_id, channel_id, sum_assured, claims, status):
+    def __init__(self, policy_start, policy_end, product_id, channel_id, sum_assured, claims, status):
         #create policy with id, start date, end date, status
-        self.id=id #unique id of policy sold. Eg PL001
+        self.id=gen_policy_id() #unique id of policy sold. Eg PL001
         self.policy_start=policy_start
         self.policy_end=policy_end
         self.product_id=product_id #product ID
@@ -44,8 +73,8 @@ class Policy:
 
 #Claim class
 class Claim:
-    def __init__(self, id, policy_id, claim_amount, claim_reason):
-        self.id=id
+    def __init__(self, policy_id, claim_amount, claim_reason):
+        self.id=gen_claim_id()
         self.policy_id=policy_id
         self.claim_amount = claim_amount #should be based on sum assured
         self.claim_reason = claim_reason #should be based product risk/conditions covered
@@ -125,12 +154,12 @@ class Policyholder:
     
     def __init__(self):
         #create policyholder data
-        self.id="PH0001" #Pxxxx
-        self.gender="M" #M, F
-        self.dob="19990101" #YYYYMMDD
-        self.smoker="Y" #Y, N
-        self.uw_status="standard" # standard, substandard
-        self.fab="Y" #Y, N - Fab is a healthy lifestyle programme
+        self.id=gen_ph_id() #PHxxxxxxx
+        self.gender=random.choice("MMMFF") #M, F
+        self.dob="1999/01/01" #YYYY/MM/DD
+        self.smoker=random.choice("YNNNN") #Y, N
+        self.uw_status= get_uw_status() # standard, substandard
+        self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
         self.first_policy_date="" #start date of first policy purchased
 
     def print_header(file_handle):
@@ -149,7 +178,7 @@ class Policyholder:
         ph_pols=[]
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
-            pol = Policy("PL001", "20101010", "20151009", "PD001", "CH0011", 100000, [], "")
+            pol = Policy("20101010", "20151009", "PD001", "CH0011", 100000, [], "")
             ph_pols.append(pol)
 
 
@@ -157,8 +186,10 @@ class Policyholder:
         #then update policy files to reflect status
         ph_pols[0].status="Lapse"
         ph_pols[1].status="Claim"
-        ph_pols[1].claims.append(Claim("CL0001", ph_pols[1].id, ph_pols[1].sum_assured, "Death"))
+        ph_pols[1].claims.append(Claim( ph_pols[1].id, ph_pols[1].sum_assured, "Death"))
         ph_pols[2].status="Mature"
+
+        #update policyholder variable first_policy_date
 
         #output to policy.csv file
         for p in ph_pols:
@@ -194,6 +225,9 @@ def init():
     Product.setup_products(file_handles[4])
     Channel.setup_channels(file_handles[3])
     
+    #setup random seed
+    np.random.seed(1227)
+
 
 #housekeeping stuff
 def housekeep():
