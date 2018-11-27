@@ -161,16 +161,26 @@ class Policyholder:
         self.uw_status= get_uw_status() # standard, substandard
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
         self.first_policy_date="" #start date of first policy purchased
+        self.policies=[]
 
     def print_header(file_handle):
-        file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab"]))
+        file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab", "First_Policy_Date"]))
         file_handle.write("\n")
     
     def output_details(self, file_handle):
-        details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab)
+        details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab, self.first_policy_date)
         ph_line=(", ").join(details)
         file_handle.writelines(ph_line)
         file_handle.write("\n")
+    
+    def update_policies(self, ph_pols):
+        self.policies=ph_pols
+        #update first_policy_date
+        all_dates = []
+        for k in ph_pols:
+            all_dates.append(k.policy_start)
+        all_dates.sort()
+        self.first_policy_date=all_dates[0]
 
     def transact_sim(self):
         #purchase k number of policies. Currently only have 4 products.
@@ -190,6 +200,7 @@ class Policyholder:
         ph_pols[2].status="Mature"
 
         #update policyholder variable first_policy_date
+        self.update_policies(ph_pols)
 
         #output to policy.csv file
         for p in ph_pols:
