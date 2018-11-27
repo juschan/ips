@@ -34,7 +34,6 @@ class Policy:
         #output to policy.csv
         details = (self.id, self.policy_start, self.policy_end, self.product_id, self.channel_id, self.status)
         pol_line=(", ").join(details)
-        print(pol_line)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
         #output claims!
@@ -56,7 +55,6 @@ class Claim:
     def output_details(self, file_handle):
         details = (self.id, self.policy_id, str(self.claim_amount), self.claim_reason)
         cl_line=(", ").join(details)
-        print(cl_line)
         file_handle.writelines(cl_line)
         file_handle.write("\n")
 
@@ -141,7 +139,6 @@ class Policyholder:
     def output_details(self, file_handle):
         details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab)
         ph_line=(", ").join(details)
-        print(ph_line)
         file_handle.writelines(ph_line)
         file_handle.write("\n")
 
@@ -151,9 +148,7 @@ class Policyholder:
         ph_pols=[]
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
-            print("create policy with product, agent, policy start date, term")
             pol = Policy("PL001", "20101010", "20151009", "PD001", "CH0011", 100000, [], "")
-            print("Housekeep - add to list of policies")
             ph_pols.append(pol)
 
 
@@ -168,34 +163,25 @@ class Policyholder:
         for p in ph_pols:
                 p.output_details(file_handles[2], file_handles[1])
     
-    def run_transactions(self):
-        print("Create policy and claim transactions")
-        self.transact_sim()
-
-    
 
 #portfolio creation
 def run_sim(n):
-    print("run sim")
     #create n number of policyholders, each with policies and claims
     for x in range(n):
-        print("Running Policyholder: " + str(x))
         #Create policyholder and transaction
         ph=Policyholder()
-        ph.run_transactions()
+        ph.transact_sim()
         #ouput details
         ph.output_details(file_handles[0])
 
 
 #init files
 def init():
-    print("Run init")
     #configure and create files
     all_files=[ph_filename, clm_filename, pol_filename, chn_filename, pd_filename]
     for f in all_files:
         output=open(f, 'w')
         file_handles.append(output)
-    print("init files: " + str(file_handles))
 
     #print headers
     Policyholder.print_header(file_handles[0])
@@ -210,12 +196,9 @@ def init():
 
 #housekeeping stuff
 def housekeep():
-    print("Run housekeeping")
     #close files
     for f in file_handles:
         f.close()
-    print("Completed housekeeping - closed all opened files")
-
 
 #run simulator
 init()
