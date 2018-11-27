@@ -43,6 +43,9 @@ def gen_claim_id():
     clm_id_count=clm_id_count+1
     return "CL" + "0"*(max_len-len(str(clm_id_count))) + str(clm_id_count)
 
+def gen_sa(): #generate sum assured
+    return np.random.randint()*50000
+
 #Policy class
 class Policy:
     def __init__(self, policy_start, policy_end, product_id, channel_id, sum_assured, claims, status):
@@ -188,7 +191,7 @@ class Policyholder:
         ph_pols=[]
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
-            pol = Policy("20101010", "20151009", "PD001", "CH0011", 100000, [], "")
+            pol = Policy("2010/10/10", "2015/10/09", "PD001", "CH0011", gen_sa, [], "")
             ph_pols.append(pol)
 
 
