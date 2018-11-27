@@ -11,7 +11,8 @@ pd_filename="products.csv"
 all_files=[]
 file_handles=[]
 all_prod=[]
-
+all_ch=[]
+ 
 #Policy class
 class Policy:
     def __init__(self, id, policy_start, policy_end, product_id, status):
@@ -45,13 +46,13 @@ class Product:
 #Channel class
 class Channel:
 
-    def __init__(self, id, name):
+    def __init__(self, id, type, name):
         self.id=id #id of channel. Eg CH1 for bank, CH2 for IFA, CH3 for Agent
+        self.type = type # channel type. Bank, IFA, Agency
         self.name=name #channel name. Bank, IFA, Agent
 
     def print_header(file_handle): #no need 'self' argument. This is a class function
-        file_handle.write("Channel_ID, Channel_Name\n")
-    
+        file_handle.write("Channel_ID, Channel_Type, Channel_Name\n")
 
 #Policyholder class
 class Policyholder:
@@ -133,8 +134,9 @@ def init():
     Policyholder.print_header(file_handles[0])
     Policy.print_header(file_handles[2])
     Product.print_header(file_handles[4])
-    #setup agents, products etc.
+    #setup products, channels etc.
     setup_products()
+    setup_channels()
 
 
 #setup products:
@@ -149,6 +151,33 @@ def setup_products():
     for p in all_prod:
         file_handles[4].write(",".join([str(p.id), str(p.name)]))
         file_handles[4].write("\n")
+
+#setup channelss:
+def setup_channels():
+    #create multiple products default templates
+    c1=Channel("CH0001", "Bank", "ABC Bank, Branch 1")
+    c2=Channel("CH0002", "Bank", "ABC Bank, Branch 2")
+    c3=Channel("CH0003", "Bank", "ABC Bank, Branch 3")
+    c4=Channel("CH0004", "Bank", "XYZ Bank, Branch 1")
+    c5=Channel("CH0005", "Bank", "XYZ Bank, Branch 2")
+    c6=Channel("CH0006", "Bank", "XYZ Bank, Branch 3")
+    c7=Channel("CH0007", "IFA", "IFA 1")
+    c8=Channel("CH0008", "IFA", "IFA 2")
+    c9=Channel("CH0009", "IFA", "IFA 3")
+    c10=Channel("CH0010", "IFA", "IFA 4")
+
+    #Add Bank and IFA
+    all_ch=[c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
+
+    #create agency channel
+    #1000 agents for agency
+    for i in range(11,1111):
+        i_length = len(str(i))
+        all_ch.append(Channel( "CH" + "0"*(4-i_length) + str(i) , "Agency" , "Agent " + str(i)))
+       
+    for c in all_ch:
+        file_handles[3].write(", ".join([str(c.id), c.type, c.name]))
+        file_handles[3].write("\n")
 
 #housekeeping stuff
 def housekeep():
