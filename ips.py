@@ -1,9 +1,10 @@
-#import libraries - csv
+#import libraries
 import random
 import numpy as np
+import datetime
 from datetime import date
 
-#declare variables
+#declare global variables
 num_ph = 10
 avg_pol = 3 #average number of policies per policyholder
 ph_filename="policyholders.csv"
@@ -21,10 +22,11 @@ clm_id_count=0
 
 # Date-related simulation variables
 # Use ISO-8601 date-time standard. YYYY-MM-DD
-# Have 10 years of simulated time - simulate for the period 2007/1/1 till 2017/12/31
+# Have 10 years of simulated time - simulate for the period 2007-1-1 till 2017-12-31
 total_days = 366*3 + 365*7 # 3 leap years (2008, 2012, 2016) and 7 non-leap
 sim_end_date = date(2017,12,31) #simulation end date
-
+dob_start = 25*365
+dob_end = 45*365
 
 #utility functions
 def get_uw_status():
@@ -53,6 +55,10 @@ def gen_claim_id():
 
 def gen_sa(): #generate random sum assured
     return np.random.randint()*50000
+
+def gen_dob_at_date(at_date):
+    days_lived_at_date = np.random.randint(dob_start, dob_end)
+    return at_date - datetime.timedelta(days=days_lived_at_date)
 
 #Policy class
 class Policy:
@@ -180,7 +186,7 @@ class Policyholder:
         #create policyholder data
         self.id=gen_ph_id() #PHxxxxxxx
         self.gender=random.choice("MMMFF") #M, F
-        self.dob=date(1999,1,1) #YYYY-MM/-D
+        self.dob=None #date(1999,1,1) #YYYY-MM-DD
         self.smoker=random.choice("YNNNN") #Y, N
         self.uw_status= get_uw_status() # standard, substandard
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
@@ -197,25 +203,27 @@ class Policyholder:
         file_handle.writelines(ph_line)
         file_handle.write("\n")
     
-    def update_policies(self, ph_pols):
-        self.policies=ph_pols
-        #update first_policy_date
-        all_dates = []
-        for k in ph_pols:
-            all_dates.append(k.policy_start)
-        all_dates.sort()
-        self.first_policy_date=all_dates[0]
-
     def transact_sim(self):
         #purchase k number of policies. Currently only have 4 products.
         num_policies = 3
-        ph_pols=[]
+
+        #create policy start dates, then update birthday and first_policy_date
+        pol_start_dates=[]
+        global sim_end_date
+        for y in range(num_policies):
+            pol_start_dates.append(sim_end_date - datetime.timedelta(days=np.random.randint(1, total_days)))
+        
+        pol_start_dates.sort()
+        self.first_policy_date = pol_start_dates[0]  
+        self.dob = gen_dob_at_date(self.first_policy_date)
+
         #for policy created, identify channel, product, then claims
+        ph_pols=[]
         for x in range(num_policies):
-            pol = Policy(date(2010,10,10), date(2015,10,9), Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
+            pol = Policy(pol_start_dates[x], date(2015,10,9), Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
             ph_pols.append(pol)
 
-        self.update_policies(ph_pols)
+        self.policies=ph_pols
 
         #decide what happens to policyholder (ie. dies, claims, lapses)
         #then update policy files to reflect status
@@ -223,9 +231,6 @@ class Policyholder:
         ph_pols[1].status="Claim"
         ph_pols[1].claims.append(Claim( ph_pols[1].id, ph_pols[1].sum_assured, "Death"))
         ph_pols[2].status="Mature"
-
-        #update policyholder variable first_policy_date
-        self.update_policies(ph_pols)
 
         #output to policy.csv file
         for p in ph_pols:
