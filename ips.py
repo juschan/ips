@@ -1,6 +1,7 @@
 #import libraries - csv
 import random
 import numpy as np
+from datetime import date
 
 #declare variables
 num_ph = 10
@@ -18,8 +19,12 @@ ph_id_count=0
 pol_id_count=0
 clm_id_count=0
 
+# Date-related simulation variables
+# Use ISO-8601 date-time standard. YYYY-MM-DD
 # Have 10 years of simulated time - simulate for the period 2007/1/1 till 2017/12/31
 total_days = 366*3 + 365*7 # 3 leap years (2008, 2012, 2016) and 7 non-leap
+sim_end_date = date(2017,12,31) #simulation end date
+
 
 #utility functions
 def get_uw_status():
@@ -46,7 +51,7 @@ def gen_claim_id():
     clm_id_count=clm_id_count+1
     return "CL" + "0"*(max_len-len(str(clm_id_count))) + str(clm_id_count)
 
-def gen_sa(): #generate sum assured
+def gen_sa(): #generate random sum assured
     return np.random.randint()*50000
 
 #Policy class
@@ -68,7 +73,7 @@ class Policy:
 
     def output_details(self, pol_file_handle, clm_file_handle):
         #output to policy.csv
-        details = (self.id, self.policy_start, self.policy_end, self.product_id, self.channel_id, self.status)
+        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.product_id, self.channel_id, self.status)
         pol_line=(", ").join(details)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
@@ -175,7 +180,7 @@ class Policyholder:
         #create policyholder data
         self.id=gen_ph_id() #PHxxxxxxx
         self.gender=random.choice("MMMFF") #M, F
-        self.dob="1999/01/01" #YYYY/MM/DD
+        self.dob=date(1999,1,1) #YYYY-MM/-D
         self.smoker=random.choice("YNNNN") #Y, N
         self.uw_status= get_uw_status() # standard, substandard
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
@@ -187,7 +192,7 @@ class Policyholder:
         file_handle.write("\n")
     
     def output_details(self, file_handle):
-        details = (self.id, self.gender, self.dob, self.smoker, self.uw_status, self.fab, self.first_policy_date)
+        details = (self.id, self.gender, self.dob.isoformat(), self.smoker, self.uw_status, self.fab, self.first_policy_date.isoformat())
         ph_line=(", ").join(details)
         file_handle.writelines(ph_line)
         file_handle.write("\n")
@@ -207,9 +212,10 @@ class Policyholder:
         ph_pols=[]
         #for policy created, identify channel, product, then claims
         for x in range(num_policies):
-            pol = Policy("2010/10/10", "2015/10/09", Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
+            pol = Policy(date(2010,10,10), date(2015,10,9), Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
             ph_pols.append(pol)
 
+        self.update_policies(ph_pols)
 
         #decide what happens to policyholder (ie. dies, claims, lapses)
         #then update policy files to reflect status
@@ -228,10 +234,12 @@ class Policyholder:
 
 #portfolio creation
 def run_sim(n):
+    global file_handles
     #create n number of policyholders, each with policies and claims
     for x in range(n):
-        #Create policyholder and transaction
+        #Create policyholder
         ph=Policyholder()
+        #Simulate transactions (ie. policy purchase, claims etc.)
         ph.transact_sim()
         #ouput details
         ph.output_details(file_handles[0])
@@ -241,6 +249,7 @@ def run_sim(n):
 def init():
     #configure and create files
     global all_files
+    global file_handles
     all_files=[ph_filename, clm_filename, pol_filename, chn_filename, pd_filename]
     for f in all_files:
         output=open(f, 'w')
