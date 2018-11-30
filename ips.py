@@ -73,7 +73,7 @@ class Policy:
         self.channel_id=channel_id #channel ID
         self.sum_assured=sum_assured
         self.claims=claims #list of claims
-        self.status=status
+        self.status=status #Active, Mature, Lapse, Death Maturity, Claim Maturity
         
         
     def print_header(file_handle):
@@ -91,7 +91,10 @@ class Policy:
 
     def gen_policies(ph, num_policies):
         ph_pols=[]
-        #generate!
+        #generate num_policies
+        for x in range(num_policies):
+            print("Generate policies")
+
         return ph_pols
 
 #Claim class
@@ -194,6 +197,7 @@ class Policyholder:
     
     def __init__(self):
         #create policyholder data
+        global sim_end_date
         self.id=gen_ph_id() #PHxxxxxxx
         self.gender=random.choice("MMMFF") #M, F
         self.dob=None #date(1999,1,1) #YYYY-MM-DD
@@ -201,15 +205,16 @@ class Policyholder:
         self.uw_status= get_uw_status() # standard, substandard
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
         self.first_policy_date="" #start date of first policy purchased
-        self.last_survival_date=""
+        self.last_survival_date=sim_end_date
+        self.death_in_sim_flag = "" #did p/h die during simulation period
         self.policies=[]
 
     def print_header(file_handle):
-        file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab", "First_Policy_Date"]))
+        file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab", "Last_Survival_Date", "First_Policy_Date"]))
         file_handle.write("\n")
     
     def output_details(self, file_handle):
-        details = (self.id, self.gender, self.dob.isoformat(), self.smoker, self.uw_status, self.fab, self.first_policy_date.isoformat())
+        details = (self.id, self.gender, self.dob.isoformat(), self.smoker, self.uw_status, self.fab, self.last_survival_date.isoformat(), self.first_policy_date.isoformat())
         ph_line=(", ").join(details)
         file_handle.writelines(ph_line)
         file_handle.write("\n")
@@ -218,7 +223,18 @@ class Policyholder:
         global sim_end_date
         #write function to determine this, based on p/h characteristics
         #return random.choice(sim_end_date, date(2016,4,3))
+        
+        #if p/h died during simulation, set death_in_sim_flag to "Y"
+
         return sim_end_date
+
+    #if died during simulation, adjust the policies
+    def death_adjustment(self):
+        if self.last_survival_date != sim_end_date:
+            for pol in self.policies:
+                if pol.status == "Active": pol.status="Death Maturity"
+                
+        
 
     def transact_sim(self):
         #create first policy start date
@@ -239,6 +255,8 @@ class Policyholder:
 
         num_policies = 3
         self.policies=Policy.gen_policies(self, num_policies)
+
+        self.death_adjustment()
 
         #output to policy.csv file
         for p in self.policies:
