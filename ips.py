@@ -60,13 +60,15 @@ def gen_dob_at_date(at_date):
     days_lived_at_date = np.random.randint(dob_start, dob_end)
     return at_date - datetime.timedelta(days=days_lived_at_date)
 
+
 #Policy class
 class Policy:
-    def __init__(self, policy_start, policy_end, product_id, channel_id, sum_assured, claims, status):
+    def __init__(self, policy_start, policy_end, policyholder_id, product_id, channel_id, sum_assured, claims, status):
         #create policy with id, start date, end date, status
         self.id=gen_policy_id() #unique id of policy sold. Eg PL001
         self.policy_start=policy_start
         self.policy_end=policy_end
+        self.policyholder_id = policyholder_Id
         self.product_id=product_id #product ID
         self.channel_id=channel_id #channel ID
         self.sum_assured=sum_assured
@@ -75,11 +77,11 @@ class Policy:
         
         
     def print_header(file_handle):
-        file_handle.write("Policy_ID, Policy_Start, Policy_End, Product_ID, Channel_ID, Status\n")
+        file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Status\n")
 
     def output_details(self, pol_file_handle, clm_file_handle):
         #output to policy.csv
-        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.product_id, self.channel_id, self.status)
+        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, self.status)
         pol_line=(", ").join(details)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
@@ -87,6 +89,10 @@ class Policy:
         for cl in self.claims:
             cl.output_details(clm_file_handle)
 
+    def gen_policies(ph, num_policies):
+        ph_pols=[]
+        #generate!
+        return ph_pols
 
 #Claim class
 class Claim:
@@ -104,6 +110,10 @@ class Claim:
         cl_line=(", ").join(details)
         file_handle.writelines(cl_line)
         file_handle.write("\n")
+
+    def gen_claims(self):
+        return  []
+
 
 #Product class
 class Product:
@@ -191,6 +201,7 @@ class Policyholder:
         self.uw_status= get_uw_status() # standard, substandard
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
         self.first_policy_date="" #start date of first policy purchased
+        self.last_survival_date=""
         self.policies=[]
 
     def print_header(file_handle):
@@ -202,38 +213,35 @@ class Policyholder:
         ph_line=(", ").join(details)
         file_handle.writelines(ph_line)
         file_handle.write("\n")
-    
-    def transact_sim(self):
-        #purchase k number of policies. Currently only have 4 products.
-        num_policies = 3
 
-        #create policy start dates, then update birthday and first_policy_date
-        pol_start_dates=[]
+    def get_last_survival_date(self):
         global sim_end_date
-        for y in range(num_policies):
-            pol_start_dates.append(sim_end_date - datetime.timedelta(days=np.random.randint(1, total_days)))
-        
-        pol_start_dates.sort()
-        self.first_policy_date = pol_start_dates[0]  
+        #write function to determine this, based on p/h characteristics
+        #return random.choice(sim_end_date, date(2016,4,3))
+        return sim_end_date
+
+    def transact_sim(self):
+        #create first policy start date
+        self.first_policy_date = sim_end_date - datetime.timedelta(days=np.random.randint(1, total_days))
+
+        #generate birthday at first policy start date
         self.dob = gen_dob_at_date(self.first_policy_date)
 
-        #for policy created, identify channel, product, then claims
-        ph_pols=[]
-        for x in range(num_policies):
-            pol = Policy(pol_start_dates[x], date(2015,10,9), Product.gen_pd_id(), Channel.gen_ch_id(), gen_sa, [], "")
-            ph_pols.append(pol)
+        #determine if p/h dies between first policy start and sim end date.
+        #if so, determine when.
+        self.get_last_survival_date()
 
-        self.policies=ph_pols
+        #Purchase at the rate of k policies during first policy start date and simulation end date.
+        #Currently only have 4 products. If more than 4, then recurr personal accident and hospitalization on annual basis.
+        #Use Poisson distribution.
+        purchase_rate = random.choice([0.3, 1, 1.3, 1.5, 1.8, 2])
+        #exposure = (self.first_policy_date - self.last_survival_date)/365.0
 
-        #decide what happens to policyholder (ie. dies, claims, lapses)
-        #then update policy files to reflect status
-        ph_pols[0].status="Lapse"
-        ph_pols[1].status="Claim"
-        ph_pols[1].claims.append(Claim( ph_pols[1].id, ph_pols[1].sum_assured, "Death"))
-        ph_pols[2].status="Mature"
+        num_policies = 3
+        self.policies=Policy.gen_policies(self, num_policies)
 
         #output to policy.csv file
-        for p in ph_pols:
+        for p in self.policies:
                 p.output_details(file_handles[2], file_handles[1])
     
 
