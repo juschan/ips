@@ -206,7 +206,6 @@ class Policyholder:
         self.fab=random.choice("YN") #Y, N - Fab is a healthy lifestyle programme
         self.first_policy_date="" #start date of first policy purchased
         self.last_survival_date=sim_end_date
-        self.death_in_sim_flag = "" #did p/h die during simulation period
         self.policies=[]
 
     def print_header(file_handle):
@@ -222,9 +221,7 @@ class Policyholder:
     def get_last_survival_date(self):
         global sim_end_date
         #write function to determine this, based on p/h characteristics
-        #return random.choice(sim_end_date, date(2016,4,3))
-        
-        #if p/h died during simulation, set death_in_sim_flag to "Y"
+        #return random.choice(sim_end_date, date(2016,4,3))  
 
         return sim_end_date
 
@@ -260,7 +257,7 @@ class Policyholder:
 
         #output to policy.csv file
         for p in self.policies:
-                p.output_details(file_handles[2], file_handles[1])
+            p.output_details(file_handles[2], file_handles[1])
     
 
 #portfolio creation
@@ -276,7 +273,7 @@ def run_sim(n):
         ph.output_details(file_handles[0])
 
 
-#init files
+#init files, random seed etc.
 def init():
     #configure and create files
     global all_files
