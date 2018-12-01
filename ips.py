@@ -73,6 +73,17 @@ def gen_num_policies(first_policy_date, last_survival_date):
     #generate Poisson sample, 1 policy every two years (0.5 per 365 days)
     return np.random.poisson(((0.5/365) * (last_survival_date - first_policy_date ).days), 1)[0]
 
+def test_if_repeat_Hosp(ph, pd, ph_pols):
+    #get last bought product
+    last_pd = ph_pols[len(ph_pols)-1]
+    if pd.id=="PD004" and last_pd.id == pd.id:
+        #can only buy if there's one year from last product
+        if last_pd.policy_end_date < ph.last_survival_date:
+            return True
+    return False
+
+
+
 #Policy class
 class Policy:
     def __init__(self, policy_start, policy_end, policyholder_id, product_id, channel_id, sum_assured, claims, status):
@@ -101,24 +112,45 @@ class Policy:
             cl.output_details(clm_file_handle)
 
     def gen_policies(ph, num_policies):
+
         ph_pols=[]
         last_channel = None
+        last_product = None
+ 
         #generate num_policies
         for x in range(num_policies):
-            pd = Product.gen_pd()
-            term = random.randint(pd.min_term, pd.max_term)
+            pd=None
+            #generate product. Tend to re-purchase Hosp
+            if last_product != None and last_product.id == "PD004":
+                    global all_prod
+                    prod_choice = all_prod.copy()
+                    prod_choice.append(all_prod[3])
+                    prod_choice.append(all_prod[3])
+                    pd = random.choice(prod_choice)
+            else:
+                pd=random.choice(all_prod)
             
             if x==0: #first policy bought
                 policy_start_date=ph.first_policy_date
                 ch=Channel.gen_ch()
-
             else: #subsequent policies
-                policy_start_date = random_date(ph.first_policy_date, ph.last_survival_date)
-
+                #if last policy bought was Hosp, then can only buy one year later
+                #if not enough remaining time, choose another product
+                if test_if_repeat_Hosp(ph, pd, ph_pols):
+                    policy_start_date = last_product.policy_end + timedelta(days=1)
+                else:
+                    prod_choice = all_prod.copy()
+                    del prod_choice[3]
+                    pd= random.choice(prod_choice)
+                    policy_start_date = random_date(ph.first_policy_date, ph.last_survival_date)
                 ch=random.choice([last_channel, last_channel, Channel.gen_ch()] ) #higher chance of buying from last channel
-            
 
             last_channel=ch
+            last_product = pd
+            
+            #generate term
+            term = random.randint(pd.min_term, pd.max_term)
+
             if (pd.id=="PD002"): #whole of life
                 policy_end_date = date(9999,12,31)
             else:
@@ -179,11 +211,6 @@ class Product:
         for p in all_prod:
             file_handle.write(",".join([str(p.id), str(p.name), str(p.min_term), str(p.max_term)]))
             file_handle.write("\n")
-
-    def gen_pd():
-        global all_prod
-        prod=random.choice(all_prod)
-        return prod
 
 #Channel class
 class Channel:
@@ -277,14 +304,13 @@ class Policyholder:
         #generate birthday at first policy start date
         self.dob = gen_dob_at_date(self.first_policy_date)
 
-        #determine if p/h dies between first policy start and sim end date.
-        #if so, determine when.
+        #determine if p/h dies between first policy start and sim end date. If so, determine when.
         self.get_last_survival_date()
 
-        #Purchase at the rate of k policies during first policy start date and last survival date.
+        #Generate num_policies number of policies.
         num_policies = gen_num_policies(self.first_policy_date, self.last_survival_date)
 
-        #Currently only have 4 products. If more than 4, then recurr personal accident and hospitalization on annual basis.
+        #Generate policies.
         self.policies=Policy.gen_policies(self, num_policies)
 
         self.death_adjustment()
