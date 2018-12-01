@@ -70,8 +70,8 @@ def add_years(d, years):
         return d+(date(d.year + years, 1, 1) - date(d.year, 1,1))
 
 def gen_num_policies(first_policy_date, last_survival_date):
-    #generate Poisson sample, 1 policy every two years (0.5 per 365 days)
-    return np.random.poisson(((0.5/365) * (last_survival_date - first_policy_date ).days), 1)[0]
+    #generate Poisson sample, 1 policy every three years (0.5 per 365 days)
+    return np.random.poisson(((0.33/365) * (last_survival_date - first_policy_date ).days), 1)[0]
 
 def test_if_repeat_Hosp(ph, pd, ph_pols):
     #get last bought product
@@ -137,7 +137,7 @@ class Policy:
                 #if last policy bought was Hosp, then can only buy one year later
                 #if not enough remaining time, choose another product
                 if test_if_repeat_Hosp(ph, pd, ph_pols):
-                    policy_start_date = last_product.policy_end + timedelta(days=1)
+                    policy_start_date = last_product.policy_end + datetime.timedelta(days=1)
                 else:
                     prod_choice = all_prod.copy()
                     del prod_choice[3]
@@ -157,7 +157,7 @@ class Policy:
                 policy_end_date = add_years(policy_start_date, random.randint(pd.min_term, pd.max_term))
 
             #create policy object and add to ph_pols
-            pol=Policy(policy_start_date, policy_end_date, ph.id, pd.id, ch.id, gen_sa(), [], "Active")
+            pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], "Active")
             ph_pols.append(pol)
 
         #generate claims
