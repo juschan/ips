@@ -70,8 +70,8 @@ def add_years(d, years):
         return d+(date(d.year + years, 1, 1) - date(d.year, 1,1))
 
 def gen_num_policies(first_policy_date, last_survival_date):
-        
-    return 3
+    #generate Poisson sample, 1 policy every two years (0.5 per 365 days)
+    return np.random.poisson(((0.5/365) * (last_survival_date - first_policy_date ).days), 1)[0]
 
 #Policy class
 class Policy:
