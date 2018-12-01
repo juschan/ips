@@ -3,22 +3,15 @@ import random
 import numpy as np
 import datetime
 from datetime import date
+import math
 
 #declare global variables
 num_ph = 10
-avg_pol = 3 #average number of policies per policyholder
-ph_filename="policyholders.csv"
-clm_filename="claims.csv"
-pol_filename="policies.csv"
-chn_filename="channels.csv"
-pd_filename="products.csv"
-all_files=[]
-file_handles=[]
-all_prod=[]
-all_ch=[]
-ph_id_count=0
-pol_id_count=0
-clm_id_count=0
+avg_pol = 0.33 #average policies bought per year.
+ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
+all_files, file_handles, all_prod, all_ch=[], [], [], []
+ph_id_count, pol_id_count, clm_id_count = 0, 0, 0
+mortality_table={}
 
 # Date-related simulation variables
 # Use ISO-8601 date-time standard. YYYY-MM-DD
@@ -71,7 +64,8 @@ def add_years(d, years):
 
 def gen_num_policies(first_policy_date, last_survival_date):
     #generate Poisson sample, 1 policy every three years (0.5 per 365 days)
-    return np.random.poisson(((0.33/365) * (last_survival_date - first_policy_date ).days), 1)[0]
+    global avg_pol
+    return np.random.poisson(((avg_pol/365) * (last_survival_date - first_policy_date ).days), 1)[0]
 
 def test_if_repeat_Hosp(ph, pd, ph_pols):
     #get last bought product
@@ -82,7 +76,13 @@ def test_if_repeat_Hosp(ph, pd, ph_pols):
             return True
     return False
 
-
+def gen_actuarial_tables():
+    #mortality rates
+    global mortality_table
+    for x in range(25,45):
+        qx = 0.0002 + math.exp(x/100) * 0.0005
+        mortality_table[str(x)] = qx
+      
 
 #Policy class
 class Policy:
@@ -182,7 +182,7 @@ class Claim:
         file_handle.write("\n")
 
     def gen_claims(self):
-        return  []
+        return []
 
 
 #Product class
@@ -356,6 +356,8 @@ def init():
     #setup random seed
     np.random.seed(1227)
 
+    #generate actuarial tablaes
+    gen_actuarial_tables()
 
 #housekeeping stuff
 def housekeep():
