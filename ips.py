@@ -54,12 +54,24 @@ def gen_claim_id():
     return "CL" + "0"*(max_len-len(str(clm_id_count))) + str(clm_id_count)
 
 def gen_sa(): #generate random sum assured
-    return np.random.randint()*50000
+    return np.random.randint(low=1, high=10, size=1)*50000
 
 def gen_dob_at_date(at_date):
     days_lived_at_date = np.random.randint(dob_start, dob_end)
     return at_date - datetime.timedelta(days=days_lived_at_date)
 
+def random_date(start, end):
+    return start + datetime.timedelta( days=random.randint(0,(end-start).days))
+
+def add_years(d, years):
+    try:
+        return d.replace(year=d.year+years)
+    except ValueError:
+        return d+(date(d.year + years, 1, 1) - date(d.year, 1,1))
+
+def gen_num_policies(first_policy_date, last_survival_date):
+        
+    return 3
 
 #Policy class
 class Policy:
@@ -68,14 +80,13 @@ class Policy:
         self.id=gen_policy_id() #unique id of policy sold. Eg PL001
         self.policy_start=policy_start
         self.policy_end=policy_end
-        self.policyholder_id = policyholder_Id
+        self.policyholder_id = policyholder_id
         self.product_id=product_id #product ID
         self.channel_id=channel_id #channel ID
         self.sum_assured=sum_assured
         self.claims=claims #list of claims
         self.status=status #Active, Mature, Lapse, Death Maturity, Claim Maturity
-        
-        
+         
     def print_header(file_handle):
         file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Status\n")
 
@@ -91,9 +102,33 @@ class Policy:
 
     def gen_policies(ph, num_policies):
         ph_pols=[]
+        last_channel = None
         #generate num_policies
         for x in range(num_policies):
-            print("Generate policies")
+            pd = Product.gen_pd()
+            term = random.randint(pd.min_term, pd.max_term)
+            
+            if x==0: #first policy bought
+                policy_start_date=ph.first_policy_date
+                ch=Channel.gen_ch()
+
+            else: #subsequent policies
+                policy_start_date = random_date(ph.first_policy_date, ph.last_survival_date)
+
+                ch=random.choice([last_channel, last_channel, Channel.gen_ch()] ) #higher chance of buying from last channel
+            
+
+            last_channel=ch
+            if (pd.id=="PD002"): #whole of life
+                policy_end_date = date(9999,12,31)
+            else:
+                policy_end_date = add_years(policy_start_date, random.randint(pd.min_term, pd.max_term))
+
+            #create policy object and add to ph_pols
+            pol=Policy(policy_start_date, policy_end_date, ph.id, pd.id, ch.id, gen_sa(), [], "Active")
+            ph_pols.append(pol)
+
+        #generate claims
 
         return ph_pols
 
@@ -121,32 +156,34 @@ class Claim:
 #Product class
 class Product:
 
-    def __init__(self, id, name):
+    def __init__(self, id, name, min_term, max_term):
         self.id=id #id of product. Eg. PD001
         self.name=name #name of product. Eg. Term Life
+        self.min_term = min_term
+        self.max_term = max_term
 
     def print_header(file_handle): #no need 'self' argument. This is a class function
-        file_handle.write("Product_ID, Product_Name\n")
+        file_handle.write("Product_ID, Product_Name, Min_Term, Max_Term\n")
 
     #setup products - class function
     def setup_products(file_handle):
         #create multiple products default templates
-        p1=Product("PD001", "Term Life")
-        p2=Product("PD002", "Whole of Life")
-        p3=Product("PD003", "Standalone Critical Illness")
-        p4=Product("PD004", "Hospitalization")
+        p1=Product("PD001", "Term Life", 3, 25)
+        p2=Product("PD002", "Whole of Life", 9999, 9999)
+        p3=Product("PD003", "Standalone Critical Illness", 5, 25)
+        p4=Product("PD004", "Hospitalization", 1, 1)
         
         global all_prod
         all_prod=[p1, p2, p3, p4]
         
         for p in all_prod:
-            file_handle.write(",".join([str(p.id), str(p.name)]))
+            file_handle.write(",".join([str(p.id), str(p.name), str(p.min_term), str(p.max_term)]))
             file_handle.write("\n")
 
-    def gen_pd_id():
+    def gen_pd():
         global all_prod
         prod=random.choice(all_prod)
-        return prod.id
+        return prod
 
 #Channel class
 class Channel:
@@ -187,10 +224,10 @@ class Channel:
             file_handle.write(", ".join([str(c.id), c.type, c.name]))
             file_handle.write("\n")
         
-    def gen_ch_id():
+    def gen_ch():
         global all_ch
         ch=random.choice(all_ch)
-        return ch.id
+        return ch
 
 #Policyholder class
 class Policyholder:
@@ -244,13 +281,10 @@ class Policyholder:
         #if so, determine when.
         self.get_last_survival_date()
 
-        #Purchase at the rate of k policies during first policy start date and simulation end date.
-        #Currently only have 4 products. If more than 4, then recurr personal accident and hospitalization on annual basis.
-        #Use Poisson distribution.
-        purchase_rate = random.choice([0.3, 1, 1.3, 1.5, 1.8, 2])
-        #exposure = (self.first_policy_date - self.last_survival_date)/365.0
+        #Purchase at the rate of k policies during first policy start date and last survival date.
+        num_policies = gen_num_policies(self.first_policy_date, self.last_survival_date)
 
-        num_policies = 3
+        #Currently only have 4 products. If more than 4, then recurr personal accident and hospitalization on annual basis.
         self.policies=Policy.gen_policies(self, num_policies)
 
         self.death_adjustment()
