@@ -12,7 +12,7 @@ avg_pol = 0.33 #average policies bought per year.
 ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
 all_files, file_handles, all_prod, all_ch=[], [], [], []
 ph_id_count, pol_id_count, clm_id_count = 0, 0, 0
-mortality_table={}
+mortality_table, ci_table, hosp_table={}, {}, {}
 
 # Date-related simulation variables
 # Use ISO-8601 date-time standard. YYYY-MM-DD
@@ -78,11 +78,17 @@ def test_if_repeat_Hosp(ph, pd, ph_pols):
     return False
 
 def gen_actuarial_tables():
-    #mortality rates, assume age last birthday
+    #mortality, ci and hosp tables, assume age last birthday
     global mortality_table
+    global ci_table
     for x in range(24,100):
         qx = 0.0002 + math.exp(x/100) * 0.0005
         mortality_table[str(x)] = qx
+        
+        kx = 0.003 + math.exp(x/100) * 0.005
+        ci_table[str(x)] = kx
+
+        hosp_table[str(x)] = kx * 0.1
 
 def age_last_birthday(dob, dt):
     #return complete years between dob and dt
@@ -192,7 +198,15 @@ class Policy:
             pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], "Active")
             ph_pols.append(pol)
 
-        #generate claims
+        #generate multiple decrements - lapse, claims, death, maturity
+        #adjust for death
+        #remove policies starting after death
+        #for policies ending after death but starting before
+        #check if term or wol -> test for lapse. Else trigger death claim
+
+        #iterate through remaining policies for ci, lapse and hosp on period by period basis
+        #let ci trigger some hosp claims and perhaps vice-versa?
+        #check for lapses too. 
 
         return ph_pols
 
