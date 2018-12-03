@@ -124,7 +124,7 @@ def get_last_survival_date(ph):
 
 #Policy class
 class Policy:
-    def __init__(self, policy_start, policy_end, policyholder_id, product_id, channel_id, sum_assured, claims, status):
+    def __init__(self, policy_start, policy_end, policyholder_id, product_id, channel_id, sum_assured, claims, status_date, status):
         #create policy with id, start date, end date, status
         self.id=gen_policy_id() #unique id of policy sold. Eg PL001
         self.policy_start=policy_start
@@ -134,6 +134,7 @@ class Policy:
         self.channel_id=channel_id #channel ID
         self.sum_assured=sum_assured
         self.claims=claims #list of claims
+        self.status_date=date.min
         self.status=status #Active, Mature, Lapse, Death Maturity, Claim Maturity
          
     def print_header(file_handle):
@@ -141,7 +142,7 @@ class Policy:
 
     def output_details(self, pol_file_handle, clm_file_handle):
         #output to policy.csv
-        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, self.status)
+        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, self.status_date.isoformat(), self.status)
         pol_line=(", ").join(details)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
@@ -195,34 +196,61 @@ class Policy:
                 policy_end_date = add_years(policy_start_date, random.randint(pd.min_term, pd.max_term))
 
             #create policy object and add to ph_pols
-            pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], "Active")
+            pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], date.min, "Active")
             ph_pols.append(pol)
+        
+        return ph_pols
 
-        #generate multiple decrements - lapse, claims, death, maturity
-        #adjust for death
-        #remove policies starting after death
+    def gen_decrements(ph):
+        ph_pols = []
+        #adjust for death by removing policies starting after death
+        for x in range(0, len(ph.policies)):
+            p=ph.policies[x]
+            if ph.last_survival_date > p.policy_start:
+                ph_pols.append(p)
+        
+        ph.policies=ph_pols
+        
         #for policies ending after death but starting before
         #check if term or wol -> test for lapse. Else trigger death claim
-
-        #iterate through remaining policies for ci, lapse and hosp on period by period basis
-        #let ci trigger some hosp claims and perhaps vice-versa?
-        #check for lapses too. 
-
-        return ph_pols
+        for p in ph_pols:
+            if (p.id=="PD001" or p.id=="PD002"):
+                if (p.policy_end < ph.last_survival_date):
+                    #test if lapse during this period
+                    result=np.random.binomial(size=1, n=1, p=0.05*((period_end, period_start).day)/365.0)
+                    if result==1:
+                        #lapse!
+                        p.status="Lapsed"
+                        p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(period_end- policy_start).days))
+                    else: #did not lapse. So mature
+                        p.status="Mature"
+                        p.status_date = p.policy_end
+                else:
+                    #death claim
+                    p.status="Death Claim"
+                    p.status_date = ph.last_survival_date
+                    p.claims.append(Claim(gen_claim_id(), p.status_date, p.sa, "Death Claim"))
+            else: #ci or hospitalization policies
+                print("do something...")
+                #iterate through remaining policies for ci, lapse and hosp on period by period basis
+                #let ci trigger some hosp claims and perhaps vice-versa?
+                #check for lapses too. 
+     
 
 #Claim class
 class Claim:
-    def __init__(self, policy_id, claim_amount, claim_reason):
+    def __init__(self, policy_id, claim_date, claim_amount, claim_reason):
         self.id=gen_claim_id()
         self.policy_id=policy_id
+        self.claim_date = claim_date
         self.claim_amount = claim_amount #should be based on sum assured
         self.claim_reason = claim_reason #should be based product risk/conditions covered
     
     def print_header(file_handle):
-        file_handle.write("Claim_ID, Policy_ID, Claim_Amount, Claim_Reason\n")
+        file_handle.write("Claim_ID, Policy_ID, Claim_date, Claim_Amount, Claim_Reason\n")
 
     def output_details(self, file_handle):
-        details = (self.id, self.policy_id, str(self.claim_amount), self.claim_reason)
+        details = (self.id, self.policy_id, self.claim_date.isoformat(), str(self.claim_amount), self.claim_reason)
         cl_line=(", ").join(details)
         file_handle.writelines(cl_line)
         file_handle.write("\n")
@@ -353,8 +381,10 @@ class Policyholder:
 
         #Generate policies.
         self.policies=Policy.gen_policies(self, num_policies)
+        Policy.gen_decrements(self)
 
-        self.death_adjustment()
+        #see if this is still required
+        #self.death_adjustment()
 
         #output to policy.csv file
         for p in self.policies:
