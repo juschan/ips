@@ -4,9 +4,10 @@ import numpy as np
 import datetime
 from datetime import date
 import math
+from dateutil.relativedelta import relativedelta
 
 #declare global variables
-num_ph = 10
+num_ph = 10000
 avg_pol = 0.33 #average policies bought per year.
 ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
 all_files, file_handles, all_prod, all_ch=[], [], [], []
@@ -77,12 +78,43 @@ def test_if_repeat_Hosp(ph, pd, ph_pols):
     return False
 
 def gen_actuarial_tables():
-    #mortality rates
+    #mortality rates, assume age last birthday
     global mortality_table
-    for x in range(25,45):
+    for x in range(24,100):
         qx = 0.0002 + math.exp(x/100) * 0.0005
         mortality_table[str(x)] = qx
-      
+
+def age_last_birthday(dob, dt):
+    #return complete years between dob and dt
+    return relativedelta(dt, dob).years
+
+
+def get_last_survival_date(ph):
+    global sim_end_date
+    global mortality_table
+    #write function to determine this, based on p/h characteristics
+    #loop through from first_policy_date each year to see if life dies. If life dies within that year, return as last_survival_date
+    period_start=ph.first_policy_date
+    period_end = period_start
+    while (period_end < sim_end_date):
+        period_end = add_years(period_start,1) - datetime.timedelta(days=1)
+        if period_end > sim_end_date: 
+            period_end = sim_end_date
+        age = age_last_birthday(ph.dob, period_start)
+        
+        #died between period start and end?
+        qx = mortality_table[str(age)]
+        result=np.random.binomial(size=1, n=1, p=qx )
+        if result==1:
+            #If died, update last_survival_date and return
+            ph.last_survival_date = period_start + datetime.timedelta( days=random.randint(0,(period_end- period_start).days))                
+            return
+        #didn't die, so repeat       
+        period_start = period_end
+    
+    #outlive simulation period. Update last_survival_date as sim_end_date
+    ph.last_survival_date = sim_end_date
+    return
 
 #Policy class
 class Policy:
@@ -282,12 +314,7 @@ class Policyholder:
         file_handle.writelines(ph_line)
         file_handle.write("\n")
 
-    def get_last_survival_date(self):
-        global sim_end_date
-        #write function to determine this, based on p/h characteristics
-        #return random.choice(sim_end_date, date(2016,4,3))  
 
-        return sim_end_date
 
     #if died during simulation, adjust the policies
     def death_adjustment(self):
@@ -305,7 +332,7 @@ class Policyholder:
         self.dob = gen_dob_at_date(self.first_policy_date)
 
         #determine if p/h dies between first policy start and sim end date. If so, determine when.
-        self.get_last_survival_date()
+        get_last_survival_date(self)
 
         #Generate num_policies number of policies.
         num_policies = gen_num_policies(self.first_policy_date, self.last_survival_date)
