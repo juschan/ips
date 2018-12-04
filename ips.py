@@ -7,12 +7,13 @@ import math
 from dateutil.relativedelta import relativedelta
 
 #declare global variables
-num_ph = 10000
+num_ph = 100
 avg_pol = 0.33 #average policies bought per year.
 ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
 all_files, file_handles, all_prod, all_ch=[], [], [], []
 ph_id_count, pol_id_count, clm_id_count = 0, 0, 0
 mortality_table, ci_table, hosp_table={}, {}, {}
+lapse_rate=0.05
 
 # Date-related simulation variables
 # Use ISO-8601 date-time standard. YYYY-MM-DD
@@ -122,6 +123,23 @@ def get_last_survival_date(ph):
     ph.last_survival_date = sim_end_date
     return
 
+def is_between(start, end, at):
+    #test if 'at' is between start and end dates.
+    if (at >= start and at <= end):
+        return True
+    return False
+
+def gen_hosp_claim_amt():
+    return np.random.randint(low=2, high=50, size=1)*5000
+
+def gen_hosp_claim_reason():
+    conditions = ["Cancer", "Heart Attack", "Stroke", "Kidney Disease", "COPD", "Paralysis"]
+    return random.choice(conditions)
+
+def gen_ci_claim_reason():
+    conditions = ["Cancer", "Heart Attack", "Stroke", "Kidney Disease", "COPD", "Paralysis", "Major Burns", "Major Organ Transplant", "Bacterial Meningitis"]
+    return random.choice(conditions)
+
 #Policy class
 class Policy:
     def __init__(self, policy_start, policy_end, policyholder_id, product_id, channel_id, sum_assured, claims, status_date, status):
@@ -136,8 +154,9 @@ class Policy:
         self.claims=claims #list of claims
         self.status_date=date.min
         self.status=status #Active, Mature, Lapse, Death Maturity, Claim Maturity
-         
-    def print_header(file_handle):
+
+    @classmethod   
+    def print_header(cls, file_handle):
         file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Status\n")
 
     def output_details(self, pol_file_handle, clm_file_handle):
@@ -150,7 +169,8 @@ class Policy:
         for cl in self.claims:
             cl.output_details(clm_file_handle)
 
-    def gen_policies(ph, num_policies):
+    @classmethod
+    def gen_policies(cls, ph, num_policies):
 
         ph_pols=[]
         last_channel = None
@@ -193,15 +213,16 @@ class Policy:
             if (pd.id=="PD002"): #whole of life
                 policy_end_date = date(9999,12,31)
             else:
-                policy_end_date = add_years(policy_start_date, random.randint(pd.min_term, pd.max_term))
+                policy_end_date = add_years(policy_start_date, term)
 
             #create policy object and add to ph_pols
             pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], date.min, "Active")
             ph_pols.append(pol)
         
         return ph_pols
-
-    def gen_decrements(ph):
+    
+    @classmethod
+    def gen_decrements(cls, ph):
         ph_pols = []
         #adjust for death by removing policies starting after death
         for x in range(0, len(ph.policies)):
@@ -214,14 +235,14 @@ class Policy:
         #for policies ending after death but starting before
         #check if term or wol -> test for lapse. Else trigger death claim
         for p in ph_pols:
-            if (p.id=="PD001" or p.id=="PD002"):
+            if p.id in ["PD001", "PD002","PD003"]:
                 if (p.policy_end < ph.last_survival_date):
                     #test if lapse during this period
-                    result=np.random.binomial(size=1, n=1, p=0.05*((period_end, period_start).day)/365.0)
+                    result=np.random.binomial(size=1, n=1, p=lapse_rate*((p.policy_end, ph.last_survival_date).day)/365.0)
                     if result==1:
                         #lapse!
                         p.status="Lapsed"
-                        p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(period_end- policy_start).days))
+                        p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(p.policy_end- ph.last_survival_date).days))
                     else: #did not lapse. So mature
                         p.status="Mature"
                         p.status_date = p.policy_end
@@ -231,11 +252,47 @@ class Policy:
                     p.status_date = ph.last_survival_date
                     p.claims.append(Claim(gen_claim_id(), p.status_date, p.sa, "Death Claim"))
             else: #ci or hospitalization policies
-                print("do something...")
                 #iterate through remaining policies for ci, lapse and hosp on period by period basis
-                #let ci trigger some hosp claims and perhaps vice-versa?
-                #check for lapses too. 
-     
+                #Death claim for CI covered in code above. No lapse for Hosp as premium paid in advance.
+                period_start = ph.first_policy_date
+                period_end = period_start
+                while period_end < ph.last_survival_date:
+                    period_end = add_years(period_start,1) - datetime.timedelta(days=1)
+                    age=age_last_birthday(ph.dob, period_start)
+
+                    #Test if Hospitalization condition is triggered. 
+                    result=np.random.binomial(size=1, n=1, p=hosp_table[str(age)])
+                    if result==1:
+                        #iterate through all policies to see if there is an active hospitalization policy.
+                        for p in ph_pols:
+                            hosp_claim_date = random_date(period_start, period_end)
+                            if (p.id=="PD004" and is_between(p.policy_start, p.policy_end, hosp_claim_date)):
+                                #create claim
+                                p.claims.append(Claim(p.id, hosp_claim_date, gen_hosp_claim_amt() , gen_hosp_claim_reason()))
+                                p.status("Claim")
+                                
+                                #80% this will trigger a CI claim:
+                                if (random.choice("YYYYN")=="Y"):
+                                    for k in ph_pols:
+                                        if(p.id=="PD003" and p.status=="Active" and is_between(p.policy_start, p.policy_end, hosp_claim_date)):
+                                            #trigger a ci claim
+                                            p.claims.append(Claim(p.id, hosp_claim_date, gen_hosp_claim_amt() , gen_hosp_claim_reason()))
+                                            p.status("Claim Maturity")
+                    
+
+                    #Test for CI condition - 20% of ci_table, given overlap with hospitalization
+                    result=np.random.binomial(size=1, n=1, p=0.2* ci_table[str(age)])
+                    if result==1: 
+                        #iterate through all policies to see if there is an active ci policy.
+                        for p in ph_pols:
+                            ci_claim_date = random_date(period_start, period_end)
+                            if (p.id=="PD003" and is_between(p.policy_start, p.policy_end, ci_claim_date)):
+                                #create claim
+                                p.claims.append(Claim(p.id, ci_claim_date, p.sa , gen_ci_claim_reason()))
+                                p.status("Claim Maturity")
+                     
+
+                    period_start = period_end + datetime.timedelta(days=1)   
 
 #Claim class
 class Claim:
@@ -246,7 +303,8 @@ class Claim:
         self.claim_amount = claim_amount #should be based on sum assured
         self.claim_reason = claim_reason #should be based product risk/conditions covered
     
-    def print_header(file_handle):
+    @classmethod
+    def print_header(cls, file_handle):
         file_handle.write("Claim_ID, Policy_ID, Claim_date, Claim_Amount, Claim_Reason\n")
 
     def output_details(self, file_handle):
@@ -255,8 +313,6 @@ class Claim:
         file_handle.writelines(cl_line)
         file_handle.write("\n")
 
-    def gen_claims(self):
-        return []
 
 
 #Product class
@@ -268,15 +324,17 @@ class Product:
         self.min_term = min_term
         self.max_term = max_term
 
-    def print_header(file_handle): #no need 'self' argument. This is a class function
+    @classmethod
+    def print_header(cls, file_handle): #no need 'self' argument. This is a class function
         file_handle.write("Product_ID, Product_Name, Min_Term, Max_Term\n")
 
     #setup products - class function
-    def setup_products(file_handle):
+    @classmethod
+    def setup_products(cls, file_handle):
         #create multiple products default templates
         p1=Product("PD001", "Term Life", 3, 25)
         p2=Product("PD002", "Whole of Life", 9999, 9999)
-        p3=Product("PD003", "Standalone Critical Illness", 5, 25)
+        p3=Product("PD003", "Accelerated Critical Illness", 5, 25)
         p4=Product("PD004", "Hospitalization", 1, 1)
         
         global all_prod
@@ -294,11 +352,13 @@ class Channel:
         self.type = type # channel type. Bank, IFA, Agency
         self.name=name #channel name. Bank, IFA, Agent
 
-    def print_header(file_handle): #no need 'self' argument. This is a class function
+    @classmethod
+    def print_header(cls, file_handle): #no need 'self' argument. This is a class function
         file_handle.write("Channel_ID, Channel_Type, Channel_Name\n")
 
     #setup channels - class function
-    def setup_channels(file_handle):
+    @classmethod
+    def setup_channels(cls, file_handle):
         #create multiple products default templates
         c1=Channel("CH0001", "Bank", "ABC Bank, Branch 1")
         c2=Channel("CH0002", "Bank", "ABC Bank, Branch 2")
@@ -324,8 +384,9 @@ class Channel:
         for c in all_ch:
             file_handle.write(", ".join([str(c.id), c.type, c.name]))
             file_handle.write("\n")
-        
-    def gen_ch():
+
+    @classmethod  
+    def gen_ch(cls):
         global all_ch
         ch=random.choice(all_ch)
         return ch
@@ -346,7 +407,8 @@ class Policyholder:
         self.last_survival_date=sim_end_date
         self.policies=[]
 
-    def print_header(file_handle):
+    @classmethod
+    def print_header(cls, file_handle):
         file_handle.write(",".join(["Policyholder_ID", "Gender", "DOB", "Smoker", "UW_Status", "Fab", "Last_Survival_Date", "First_Policy_Date"]))
         file_handle.write("\n")
     
