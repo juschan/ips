@@ -7,13 +7,26 @@ import math
 from dateutil.relativedelta import relativedelta
 
 #declare global variables
-num_ph = 100
+num_ph = 1000000
 avg_pol = 0.33 #average policies bought per year.
 ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
 all_files, file_handles, all_prod, all_ch=[], [], [], []
 ph_id_count, pol_id_count, clm_id_count = 0, 0, 0
 mortality_table, ci_table, hosp_table={}, {}, {}
 lapse_rate=0.05
+#assume mortality,ci and hosp rates for male non-smoker, standard, non-fab
+mort_female = -0.1
+mort_smoker= 0.15
+mort_substandard = 5
+mort_fab = -7
+ci_female = 0.2
+ci_smoker = 0.25
+ci_substandard = 7
+ci_fab = -3
+hosp_female = 0.1
+hosp_smoker = 0.1
+hosp_substandard = 7
+hosp_fab = -5
 
 # Date-related simulation variables
 # Use ISO-8601 date-time standard. YYYY-MM-DD
@@ -82,14 +95,60 @@ def gen_actuarial_tables():
     #mortality, ci and hosp tables, assume age last birthday
     global mortality_table
     global ci_table
-    for x in range(24,100):
+    global hosp_table
+    for x in range(17,100):
         qx = 0.0002 + math.exp(x/100) * 0.0005
-        mortality_table[str(x)] = qx
+        mortality_table[x] = qx
         
         kx = 0.003 + math.exp(x/100) * 0.005
-        ci_table[str(x)] = kx
+        ci_table[x] = kx
 
-        hosp_table[str(x)] = kx * 0.1
+        hosp_table[x] = kx * 0.1
+
+def get_ci_rate(ph, dt):
+    global ci_table
+    #adjust for gender, smoker, uw_status, fab
+    age_adj = 0
+    if(ph.fab=="Y"): age_adj = ci_fab
+    if(ph.uw_status=="substandard"): age_adj += ci_substandard
+    
+    age = age_last_birthday(ph.dob, dt) + age_adj
+    ci_rate = ci_table[age]
+    
+    if(ph.gender=="F"): ci_rate *= (1+ci_female)
+    if(ph.smoker=="Y"): ci_rate *= (1+ci_smoker)
+
+    return ci_rate
+
+def get_mort_rate(ph, dt):
+    global mortality_table
+    #adjust for gender, smoker, uw_status, fab
+    age_adj = 0
+    if(ph.fab=="Y"): age_adj = mort_fab
+    if(ph.uw_status=="substandard"): age_adj += mort_substandard
+    
+    age = age_last_birthday(ph.dob, dt) + age_adj
+    mort_rate = mortality_table[age]
+    
+    if(ph.gender=="F"): mort_rate *= (1+mort_female)
+    if(ph.smoker=="Y"): mort_rate *= (1+mort_smoker)
+
+    return mort_rate
+
+def get_hosp_rate(ph, dt):
+    global hosp_table
+    #adjust for gender, smoker, uw_status, fab
+    age_adj = 0
+    if(ph.fab=="Y"): age_adj = hosp_fab
+    if(ph.uw_status=="substandard"): age_adj += hosp_substandard
+    
+    age = age_last_birthday(ph.dob, dt) + age_adj
+    hosp_rate = hosp_table[age]
+    
+    if(ph.gender=="F"): hosp_rate *= (1+hosp_female)
+    if(ph.smoker=="Y"): hosp_rate *= (1+hosp_smoker)
+
+    return hosp_rate
 
 def age_last_birthday(dob, dt):
     #return complete years between dob and dt
@@ -110,7 +169,7 @@ def get_last_survival_date(ph):
         age = age_last_birthday(ph.dob, period_start)
         
         #died between period start and end?
-        qx = mortality_table[str(age)]
+        qx = get_mort_rate(ph, period_start)
         result=np.random.binomial(size=1, n=1, p=qx )
         if result==1:
             #If died, update last_survival_date and return
@@ -223,6 +282,8 @@ class Policy:
     
     @classmethod
     def gen_decrements(cls, ph):
+        global ci_table
+        global hosp_table
         ph_pols = []
         #adjust for death by removing policies starting after death
         for x in range(0, len(ph.policies)):
@@ -253,7 +314,7 @@ class Policy:
                     p.claims.append(Claim(gen_claim_id(), p.status_date, p.sa, "Death Claim"))
             else: #ci or hospitalization policies
                 #iterate through remaining policies for ci, lapse and hosp on period by period basis
-                #Death claim for CI covered in code above. No lapse for Hosp as premium paid in advance.
+                #Death claim for CI `covered in code above. No lapse for Hosp as premium paid in advance.
                 period_start = ph.first_policy_date
                 period_end = period_start
                 while period_end < ph.last_survival_date:
@@ -261,7 +322,7 @@ class Policy:
                     age=age_last_birthday(ph.dob, period_start)
 
                     #Test if Hospitalization condition is triggered. 
-                    result=np.random.binomial(size=1, n=1, p=hosp_table[str(age)])
+                    result=np.random.binomial(size=1, n=1, p=get_hosp_rate(ph, period_start) )
                     if result==1:
                         #iterate through all policies to see if there is an active hospitalization policy.
                         for p in ph_pols:
@@ -281,14 +342,15 @@ class Policy:
                     
 
                     #Test for CI condition - 20% of ci_table, given overlap with hospitalization
-                    result=np.random.binomial(size=1, n=1, p=0.2* ci_table[str(age)])
+                    ci_rate = get_ci_rate(ph, period_start)
+                    result=np.random.binomial(size=1, n=1, p=0.2*ci_rate)
                     if result==1: 
                         #iterate through all policies to see if there is an active ci policy.
                         for p in ph_pols:
                             ci_claim_date = random_date(period_start, period_end)
                             if (p.id=="PD003" and is_between(p.policy_start, p.policy_end, ci_claim_date)):
                                 #create claim
-                                p.claims.append(Claim(p.id, ci_claim_date, p.sa , gen_ci_claim_reason()))
+                                p.claims.append(Claim(p.id, ci_claim_date, p.sa, gen_ci_claim_reason()))
                                 p.status("Claim Maturity")
                      
 
