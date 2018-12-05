@@ -7,7 +7,7 @@ import math
 from dateutil.relativedelta import relativedelta
 
 #declare global variables
-num_ph = 10000
+num_ph = 1200000
 avg_pol = 0.33 #average policies bought per year.
 ph_filename, clm_filename, pol_filename, chn_filename, pd_filename = "policyholders.csv", "claims.csv", "policies.csv", "channels.csv", "products.csv"
 all_files, file_handles, all_prod, all_ch=[], [], [], []
