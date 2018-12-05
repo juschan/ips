@@ -234,6 +234,7 @@ class Policy:
 
     @classmethod
     def gen_policies(cls, ph, num_policies):
+        global sim_end_date
 
         ph_pols=[]
         last_channel = None
@@ -244,11 +245,11 @@ class Policy:
             pd=None
             #generate product. Tend to re-purchase Hosp
             if last_product != None and last_product.id == "PD004":
-                    global all_prod
-                    prod_choice = all_prod.copy()
-                    prod_choice.append(all_prod[3])
-                    prod_choice.append(all_prod[3])
-                    pd = random.choice(prod_choice)
+                global all_prod
+                prod_choice = all_prod.copy()
+                prod_choice.append(all_prod[3])
+                prod_choice.append(all_prod[3])
+                pd = random.choice(prod_choice)
             else:
                 pd=random.choice(all_prod)
             
@@ -264,7 +265,7 @@ class Policy:
                     prod_choice = all_prod.copy()
                     del prod_choice[3]
                     pd= random.choice(prod_choice)
-                    policy_start_date = random_date(ph.first_policy_date, ph.last_survival_date)
+                    policy_start_date = random_date(ph.first_policy_date, sim_end_date)
                 ch=random.choice([last_channel, last_channel, Channel.gen_ch()] ) #higher chance of buying from last channel
 
             last_channel=ch
@@ -276,10 +277,10 @@ class Policy:
             if (pd.id=="PD002"): #whole of life
                 policy_end_date = date(9999,12,31)
             else:
-                policy_end_date = add_years(policy_start_date, term)
+                policy_end_date = add_years(policy_start_date, term) - datetime.timedelta(days=1)
 
             #create policy object and add to ph_pols
-            pol=Policy(policy_start_date, policy_end_date - datetime.timedelta(days=1), ph.id, pd.id, ch.id, gen_sa(), [], date.min, "Active")
+            pol=Policy(policy_start_date, policy_end_date, ph.id, pd.id, ch.id, gen_sa(), [], date.min, "Active")
             ph_pols.append(pol)
         
         return ph_pols
@@ -301,22 +302,22 @@ class Policy:
         #check if term or wol -> test for lapse. Else trigger death claim
         for p in ph_pols:
             if p.product_id in ["PD001", "PD002","PD003"]:
-                if (p.policy_end < ph.last_survival_date):
-                    #test if lapse during this period
-                    result=np.random.binomial(size=1, n=1, p=lapse_rate*((ph.last_survival_date - p.policy_end).days)/365.0)
-                    if result==1:
-                        #lapse!
-                        p.status="Lapsed"
-                        p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(ph.last_survival_date-p.policy_end).days))
-                    else: #did not lapse. So mature
+                #determine period end
+                period_end = min(p.policy_end, ph.last_survival_date)
+                #test if lapse during this period
+                result=np.random.binomial(size=1, n=1, p=lapse_rate*((period_end - p.policy_start).days)/365.0)
+                if result==1:
+                    #lapse!
+                    p.status="Lapsed"
+                    p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(period_end-p.policy_start).days))
+                else: #did not lapse - mature or died
+                    if is_between(p.policy_start, p.policy_end, ph.last_survival_date): 
+                        p.status="Death Claim"
+                        p.claims.append(Claim(p.id, ph.last_survival_date, p.sum_assured, "Death Claim"))
+                    else:
                         p.status="Mature"
                         p.status_date = p.policy_end
-                else:
-                    #death claim
-                    p.status="Death Claim"
-                    p.status_date = ph.last_survival_date
-                    p.claims.append(Claim(p.id, p.status_date, p.sum_assured, "Death Claim"))
-
+          
         #ci or hospitalization policies
         #iterate through remaining policies for ci, lapse and hosp on period by period basis
         #Death claim for CI `covered in code above. No lapse for Hosp as premium paid in advance.
