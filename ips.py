@@ -88,7 +88,7 @@ def test_if_repeat_Hosp(ph, pd, ph_pols):
     last_pd = ph_pols[len(ph_pols)-1]
     if pd.id=="PD004" and last_pd.id == pd.id:
         #can only buy if there's one year from last product
-        if last_pd.policy_end_date < ph.last_survival_date:
+        if (last_pd.policy_end_date + - datetime.timedelta(days=1)) < ph.last_survival_date:
             return True
     return False
 
@@ -104,7 +104,7 @@ def gen_actuarial_tables():
         kx = 0.003 + math.exp(x/100) * 0.005
         ci_table[x] = kx
 
-        hosp_table[x] = kx * 0.1
+        hosp_table[x] = kx * 1.2
 
 def get_ci_rate(ph, dt):
     global ci_table
@@ -239,9 +239,10 @@ class Policy:
         ph_pols=[]
         last_channel = None
         last_product = None
+        x=0
  
         #generate num_policies
-        for x in range(num_policies):
+        while x < num_policies: 
             pd=None
             #generate product. Tend to re-purchase Hosp
             if last_product != None and last_product.id == "PD004":
@@ -262,10 +263,11 @@ class Policy:
                 if test_if_repeat_Hosp(ph, pd, ph_pols):
                     policy_start_date = last_product.policy_end + datetime.timedelta(days=1)
                 else:
+                    #choose another product that's not hosp
                     prod_choice = all_prod.copy()
                     del prod_choice[3]
                     pd= random.choice(prod_choice)
-                    policy_start_date = random_date(ph.first_policy_date, sim_end_date)
+                    policy_start_date = random_date(ph.first_policy_date, ph.last_survival_date)
                 ch=random.choice([last_channel, last_channel, Channel.gen_ch()] ) #higher chance of buying from last channel
 
             last_channel=ch
@@ -282,21 +284,16 @@ class Policy:
             #create policy object and add to ph_pols
             pol=Policy(policy_start_date, policy_end_date, ph.id, pd.id, ch.id, gen_sa(), [], date.min, "Active")
             ph_pols.append(pol)
+            x +=1
         
+        #print(str(len(ph_pols)))
         return ph_pols
     
     @classmethod
     def gen_decrements(cls, ph):
         global ci_table
         global hosp_table
-        ph_pols = []
-        #adjust for death by removing policies starting after death
-        for x in range(0, len(ph.policies)):
-            p=ph.policies[x]
-            if ph.last_survival_date > p.policy_start:
-                ph_pols.append(p)
-        
-        ph.policies=ph_pols
+        ph_pols = ph.policies.copy()
 
         #for policies ending after death but starting before
         #check if term or wol -> test for lapse. Else trigger death claim
@@ -312,7 +309,7 @@ class Policy:
                     p.status="Lapsed"
                     p.status_date=p.policy_start + datetime.timedelta( days=random.randint(0,(period_end-p.policy_start).days))
                 else: #did not lapse - mature or died
-                    if is_between(p.policy_start, p.policy_end, ph.last_survival_date): 
+                    if is_between(p.policy_start, p.policy_end, ph.last_survival_date) and ph.last_survival_date !=sim_end_date: 
                         p.status="Death Claim"
                         p.status_date= ph.last_survival_date
                         p.claims.append(Claim(p.id, ph.last_survival_date, p.sum_assured, "Death Claim"))
@@ -363,6 +360,7 @@ class Policy:
                         p.status("Claim Maturity")
 
             period_start = period_end + datetime.timedelta(days=1)
+
         return ph_pols 
 
 #Claim class
@@ -504,9 +502,9 @@ class Policyholder:
         #determine if p/h dies between first policy start and sim end date. If so, determine when.
         get_last_survival_date(self)
 
-        #print("PH: first: " + self.first_policy_date.isoformat() + "; last: " + self.last_survival_date.isoformat())
         #Generate num_policies number of policies.
         num_policies = gen_num_policies(self.first_policy_date, self.last_survival_date)
+        #print(num_policies)
 
         #Generate policies.
         self.policies=Policy.gen_policies(self, num_policies)
