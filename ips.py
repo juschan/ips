@@ -38,7 +38,7 @@ dob_end = 45*365
 
 #utility functions
 def get_uw_status():
-    result=np.random.binomial(size=1, n=1, p=0.7)
+    result=np.random.binomial(size=1, n=1, p=0.7)[0]
     if result==1:
         return "standard"
     return "substandard"
@@ -62,7 +62,7 @@ def gen_claim_id():
     return "CL" + "0"*(max_len-len(str(clm_id_count))) + str(clm_id_count)
 
 def gen_sa(): #generate random sum assured
-    return np.random.randint(low=1, high=10, size=1)*50000
+    return np.random.randint(low=1, high=10, size=1)[0]*50000
 
 def gen_dob_at_date(at_date):
     days_lived_at_date = np.random.randint(dob_start, dob_end)
@@ -171,7 +171,7 @@ def get_last_survival_date(ph):
         
         #died between period start and end?
         qx = get_mort_rate(ph, period_start)
-        result=np.random.binomial(size=1, n=1, p=qx )
+        result=np.random.binomial(size=1, n=1, p=qx )[0]
         if result==1:
             #If died, update last_survival_date and return
             ph.last_survival_date = period_start + datetime.timedelta( days=random.randint(0,(period_end- period_start).days))                
@@ -190,7 +190,7 @@ def is_between(start, end, at):
     return False
 
 def gen_hosp_claim_amt():
-    return np.random.randint(low=2, high=50, size=1)*5000
+    return np.random.randint(low=2, high=50, size=1)[0]*5000
 
 def gen_hosp_claim_reason():
     conditions = ["Cancer", "Heart Attack", "Stroke", "Kidney Disease", "COPD", "Paralysis"]
@@ -217,11 +217,11 @@ class Policy:
 
     @classmethod   
     def print_header(cls, file_handle):
-        file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Status\n")
+        file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Sum_Assured, Status_Date, Status\n")
 
     def output_details(self, pol_file_handle, clm_file_handle):
         #output to policy.csv
-        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, self.status_date.isoformat(), self.status)
+        details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, str(self.sum_assured), self.status_date.isoformat(), self.status)
         pol_line=(", ").join(details)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
@@ -305,7 +305,8 @@ class Policy:
                 #determine period end
                 period_end = min(p.policy_end, ph.last_survival_date)
                 #test if lapse during this period
-                result=np.random.binomial(size=1, n=1, p=lapse_rate*((period_end - p.policy_start).days)/365.0)
+                #print("Time - " + period_end.isoformat() + "; " + p.policy_start.isoformat() )
+                result=np.random.binomial(size=1, n=1, p=lapse_rate*((period_end - p.policy_start).days)/365.0)[0]
                 if result==1:
                     #lapse!
                     p.status="Lapsed"
@@ -313,6 +314,7 @@ class Policy:
                 else: #did not lapse - mature or died
                     if is_between(p.policy_start, p.policy_end, ph.last_survival_date): 
                         p.status="Death Claim"
+                        p.status_date= ph.last_survival_date
                         p.claims.append(Claim(p.id, ph.last_survival_date, p.sum_assured, "Death Claim"))
                     else:
                         p.status="Mature"
@@ -328,7 +330,7 @@ class Policy:
             age=age_last_birthday(ph.dob, period_start)
 
             #Test if Hospitalization condition is triggered. 
-            result=np.random.binomial(size=1, n=1, p=get_hosp_rate(ph, period_start) )
+            result=np.random.binomial(size=1, n=1, p=get_hosp_rate(ph, period_start))[0]
             if result==1:
                 #iterate through all policies to see if there is an active hospitalization policy.
                 for p in ph_pols:
@@ -345,11 +347,12 @@ class Policy:
                                     #trigger a ci claim
                                     p.claims.append(Claim(p.id, hosp_claim_date, p.sum_assured, gen_ci_claim_reason()))
                                     p.status="CI Claim Maturity"
+                                    p.status_date = hosp_claim_date
                     
 
             #Test for CI condition - 20% of ci_table, given overlap with hospitalization
             ci_rate = get_ci_rate(ph, period_start)
-            result=np.random.binomial(size=1, n=1, p=0.2*ci_rate)
+            result=np.random.binomial(size=1, n=1, p=0.2*ci_rate)[0]
             if result==1: 
                 #iterate through all policies to see if there is an active ci policy.
                 for p in ph_pols:
@@ -501,6 +504,7 @@ class Policyholder:
         #determine if p/h dies between first policy start and sim end date. If so, determine when.
         get_last_survival_date(self)
 
+        #print("PH: first: " + self.first_policy_date.isoformat() + "; last: " + self.last_survival_date.isoformat())
         #Generate num_policies number of policies.
         num_policies = gen_num_policies(self.first_policy_date, self.last_survival_date)
 
