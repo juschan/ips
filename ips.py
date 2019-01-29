@@ -217,12 +217,12 @@ class Policy:
 
     @classmethod   
     def print_header(cls, file_handle):
-        file_handle.write("Policy_ID, Policy_Start, Policy_End, Policyholder_ID, Product_ID, Channel_ID, Sum_Assured, Status_Date, Status\n")
+        file_handle.write("Policy_ID,Policy_Start,Policy_End,Policyholder_ID,Product_ID,Channel_ID,Sum_Assured,Status_Date,Status\n")
 
     def output_details(self, pol_file_handle, clm_file_handle):
         #output to policy.csv
         details = (self.id, self.policy_start.isoformat(), self.policy_end.isoformat(), self.policyholder_id, self.product_id, self.channel_id, str(self.sum_assured), self.status_date.isoformat(), self.status)
-        pol_line=(", ").join(details)
+        pol_line=(",").join(details)
         pol_file_handle.writelines(pol_line)
         pol_file_handle.write("\n")
         #output claims!
@@ -374,7 +374,7 @@ class Claim:
     
     @classmethod
     def print_header(cls, file_handle):
-        file_handle.write("Claim_ID, Policy_ID, Claim_date, Claim_Amount, Claim_Reason\n")
+        file_handle.write("Claim_ID,Policy_ID,Claim_date,Claim_Amount,Claim_Reason\n")
 
     def output_details(self, file_handle):
         details = (self.id, self.policy_id, self.claim_date.isoformat(), str(self.claim_amount), self.claim_reason)
@@ -394,7 +394,7 @@ class Product:
 
     @classmethod
     def print_header(cls, file_handle): #no need 'self' argument. This is a class function
-        file_handle.write("Product_ID, Product_Name, Min_Term, Max_Term\n")
+        file_handle.write("Product_ID,Product_Name,Min_Term,Max_Term\n")
 
     #setup products - class function
     @classmethod
@@ -422,7 +422,7 @@ class Channel:
 
     @classmethod
     def print_header(cls, file_handle): #no need 'self' argument. This is a class function
-        file_handle.write("Channel_ID, Channel_Type, Channel_Name\n")
+        file_handle.write("Channel_ID,Channel_Type,Channel_Name\n")
 
     #setup channels - class function
     @classmethod
@@ -450,7 +450,7 @@ class Channel:
             all_ch.append(Channel( "CH" + "0"*(4-i_length) + str(i) , "Agency" , "Agent " + str(i)))
 
         for c in all_ch:
-            file_handle.write(", ".join([str(c.id), c.type, c.name]))
+            file_handle.write(",".join([str(c.id), c.type, c.name]))
             file_handle.write("\n")
 
     @classmethod  
